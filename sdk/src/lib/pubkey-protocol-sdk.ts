@@ -152,11 +152,22 @@ export class PubKeyProtocolSdk {
     )
   }
 
-  async communityGet({ community }: { community: string }) {
-    return isValidPublicKey(community)
+  async communityGet({ community, nullable = false }: { community: string, nullable?: boolean }) {
+    const result = isValidPublicKey(community)
       ? await this.communityGetByPda({ community: new PublicKey(community) })
-      : await this.communityGetBySlug({ slug: community })
+      : await this.communityGetBySlug({ slug: community });
+  
+    if (!result && nullable) {
+      return null;
+    }
+  
+    if (!result && !nullable) {
+      throw new Error('Community not found');
+    }
+  
+    return result;
   }
+  
 
   async communityGetByPda(options: { community: PublicKey }): Promise<PubKeyCommunity> {
     return this.program.account.community.fetch(options.community).then(
@@ -285,29 +296,23 @@ export class PubKeyProtocolSdk {
     return { input, tx }
   }
 
-  async configGet(): Promise<PubKeyConfig> {
-    const [config] = this.pdaConfig()
-
-    return this.program.account.config.fetch(config).then(
-      (res) =>
-        ({
-          ...res,
-          publicKey: config,
-        } as PubKeyConfig),
-    )
+  async configGet({ nullable = false }: { nullable?: boolean } = {}): Promise<PubKeyConfig | null> {
+    const [config] = this.pdaConfig();
+  
+    const fetchMethod = nullable
+      ? this.program.account.config.fetchNullable
+      : this.program.account.config.fetch;
+  
+    return fetchMethod(config).then((res) =>
+      res
+        ? ({
+            ...res,
+            publicKey: config,
+          } as PubKeyConfig)
+        : null,
+    );
   }
-
-  async configGetNullable(): Promise<PubKeyConfig | null> {
-    const [config] = this.pdaConfig()
-
-    return this.program.account.config.fetchNullable(config).then(
-      (res) =>
-        ({
-          ...res,
-          publicKey: config,
-        } as PubKeyConfig),
-    )
-  }
+  
 
   async configInit(options: { communityAuthority: PublicKeyString; authority: PublicKeyString }) {
     const authority = new PublicKey(options.authority)
@@ -344,13 +349,14 @@ export class PubKeyProtocolSdk {
     )
   }
 
-  async pointerGet(options: { pointer: PublicKey }) {
-    return this.program.account.pointer.fetch(options.pointer)
+  async pointerGet({ pointer, nullable = false }: { pointer: PublicKey, nullable?: boolean }) {
+    const fetchMethod = nullable
+      ? this.program.account.pointer.fetchNullable
+      : this.program.account.pointer.fetch;
+  
+    return fetchMethod(pointer);
   }
-
-  async pointerGetNullable(options: { pointer: PublicKey }) {
-    return this.program.account.pointer.fetchNullable(options.pointer)
-  }
+  
 
   async profileGetAll(): Promise<PubKeyProfile[]> {
     return this.program.account.profile.all().then((accounts) =>
@@ -369,12 +375,33 @@ export class PubKeyProtocolSdk {
     )
   }
 
-  async profileGet(options: { profile: string }) {
-    const profile = options.profile
+  async profileGet({ profile, nullable = false }: { profile: string, nullable?: boolean }): Promise<PubKeyProfile | null> {
+    const fetchProfile = async (profileKey: PublicKey) => {
+      const fetchMethod = nullable
+        ? this.program.account.profile.fetchNullable
+        : this.program.account.profile.fetch;
+  
+      return fetchMethod(profileKey).then((res) => {
+        if (!res) return null;
+  
+        const identities = res.identities.map((identity) => ({
+          ...identity,
+          provider: convertAnchorIdentityProvider(identity.provider),
+        }));
+  
+        return {
+          ...res,
+          publicKey: profileKey,
+          identities,
+        };
+      });
+    };
+  
     return isValidPublicKey(profile)
-      ? await this.profileGetByPda({ profile: new PublicKey(profile) })
-      : await this.profileGetByUsername({ username: profile })
+      ? await fetchProfile(new PublicKey(profile))
+      : await this.profileGetByUsername({ username: profile });
   }
+  
 
   async profileGetByPda(options: { profile: PublicKey }): Promise<PubKeyProfile> {
     const publicKey = new PublicKey(options.profile)
@@ -390,23 +417,7 @@ export class PubKeyProtocolSdk {
     }))
   }
 
-  async profileGetNullable(options: { profile: PublicKey }): Promise<PubKeyProfile | null> {
-    return this.program.account.profile.fetchNullable(options.profile).then((res) => {
-      if (!res) {
-        return null
-      }
-      const identities = res.identities.map((identity) => ({
-        ...identity,
-        provider: convertAnchorIdentityProvider(identity.provider),
-      }))
 
-      return {
-        ...res,
-        publicKey: options.profile,
-        identities,
-      }
-    })
-  }
 
   async profileGetByProvider(options: ProfileGetByProvider): Promise<PubKeyProfile> {
     const [pointer] = this.pdaPointer(options)
