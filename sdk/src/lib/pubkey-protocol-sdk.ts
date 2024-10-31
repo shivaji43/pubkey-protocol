@@ -375,7 +375,7 @@ export class PubKeyProtocolSdk {
     )
   }
 
-  async profileGet({ profile, nullable = false }: { profile: string, nullable?: boolean }): Promise<PubKeyProfile | null> {
+  async profileGet({ profile, nullable = false }: { profile: string | PublicKey, nullable?: boolean }): Promise<PubKeyProfile | null> {
     const fetchProfile = async (profileKey: PublicKey) => {
       const fetchMethod = nullable
         ? this.program.account.profile.fetchNullable
@@ -397,10 +397,15 @@ export class PubKeyProtocolSdk {
       });
     };
   
-    return isValidPublicKey(profile)
-      ? await fetchProfile(new PublicKey(profile))
-      : await this.profileGetByUsername({ username: profile });
+    if (typeof profile === 'string') {
+      return isValidPublicKey(profile)
+        ? await fetchProfile(new PublicKey(profile))
+        : await this.profileGetByUsername({ username: profile });
+    } else {
+      return await fetchProfile(profile);
+    }
   }
+  
   
 
   async profileGetByPda(options: { profile: PublicKey }): Promise<PubKeyProfile> {
