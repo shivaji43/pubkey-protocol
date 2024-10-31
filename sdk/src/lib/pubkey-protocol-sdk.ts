@@ -430,7 +430,7 @@ export class PubKeyProtocolSdk {
   async profileGetByProviderNullable(options: ProfileGetByProvider): Promise<PubKeyProfile | null> {
     const [pointer] = this.pdaPointer(options)
 
-    const found = await this.pointerGetNullable({ pointer })
+    const found = await this.pointerGet({ pointer , nullable : true})
 
     if (!found) {
       return null
@@ -438,7 +438,7 @@ export class PubKeyProtocolSdk {
 
     const { profile } = found
 
-    return this.profileGetNullable({ profile })
+    return this.profileGet({ profile , nullable:true })
   }
 
   async profileGetByUsername(options: ProfileGetByUsername): Promise<PubKeyProfile> {
@@ -450,7 +450,7 @@ export class PubKeyProtocolSdk {
   async profileGetByUsernameNullable(options: ProfileGetByUsername): Promise<PubKeyProfile | null> {
     const [profile] = this.pdaProfile({ username: options.username })
 
-    return this.profileGetNullable({ profile })
+    return this.profileGet({ profile , nullable :true})
   }
 
   async profileAuthorityAdd(options: ProfileAuthorityAddOptions) {
